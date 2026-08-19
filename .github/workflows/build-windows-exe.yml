@@ -5,11 +5,11 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'windows/**'
+      - 'windows/stock_ai_v1_5.zip.b64'
       - '.github/workflows/build-windows-exe.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-windows-exe:
@@ -77,3 +77,16 @@ jobs:
           path: windows/src/dist/StockAIAnalyzer_v1_5.exe
           if-no-files-found: error
           retention-days: 30
+
+      - name: Record successful run ID
+        shell: pwsh
+        run: |
+          Set-Content -Path 'windows/latest_windows_run.txt' -Value '${{ github.run_id }}' -Encoding ascii
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add windows/latest_windows_run.txt
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
+            git commit -m 'Record latest successful Windows EXE run [skip ci]'
+            git push
+          }
