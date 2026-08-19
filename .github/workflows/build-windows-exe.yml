@@ -1,0 +1,79 @@
+name: Build Windows Stock Analyzer EXE
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'windows/**'
+      - '.github/workflows/build-windows-exe.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-exe:
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+          cache-dependency-path: windows/stock_ai_v1_5.zip.b64
+
+      - name: Decode source package
+        shell: pwsh
+        run: |
+          $b64 = Get-Content 'windows/stock_ai_v1_5.zip.b64' -Raw
+          [IO.File]::WriteAllBytes('windows/stock_ai_v1_5.zip', [Convert]::FromBase64String($b64))
+          New-Item -ItemType Directory -Force -Path 'windows/src' | Out-Null
+          Expand-Archive -Path 'windows/stock_ai_v1_5.zip' -DestinationPath 'windows/src' -Force
+          Get-ChildItem 'windows/src'
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r windows/src/requirements.txt
+          python -m pip install --upgrade pyinstaller
+
+      - name: Syntax check
+        shell: pwsh
+        run: |
+          python -m py_compile windows/src/stock_ai_analyzer_v1_5.py
+
+      - name: Build EXE
+        shell: pwsh
+        working-directory: windows/src
+        run: |
+          pyinstaller --noconfirm --clean --onefile --windowed `
+            --name StockAIAnalyzer_v1_5 `
+            --collect-all yfinance `
+            --collect-all FinanceDataReader `
+            --collect-all pykrx `
+            --collect-all matplotlib `
+            --collect-all openai `
+            --collect-all bs4 `
+            stock_ai_analyzer_v1_5.py
+
+      - name: Verify EXE
+        shell: pwsh
+        run: |
+          $exe = 'windows/src/dist/StockAIAnalyzer_v1_5.exe'
+          if (!(Test-Path $exe)) { throw 'EXE file was not created.' }
+          Get-Item $exe | Format-List Name,Length,LastWriteTime
+          Get-FileHash $exe -Algorithm SHA256
+
+      - name: Upload Windows EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: StockAIAnalyzer-v1.5-Windows-EXE
+          path: windows/src/dist/StockAIAnalyzer_v1_5.exe
+          if-no-files-found: error
+          retention-days: 30
