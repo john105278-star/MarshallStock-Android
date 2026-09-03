@@ -15,6 +15,26 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Check Nightscout live feed
+        continue-on-error: true
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, urllib.request, datetime
+          url='https://hyeona.up.railway.app/api/v1/entries.json?count=1&_=' + str(int(datetime.datetime.now().timestamp()))
+          req=urllib.request.Request(url, headers={'Cache-Control':'no-cache','Pragma':'no-cache','User-Agent':'HyeonaLowGuard-build-check/1.1'})
+          with urllib.request.urlopen(req, timeout=15) as r:
+              data=json.load(r)
+          if not data:
+              print('NIGHTSCOUT_LATEST no_data')
+          else:
+              e=data[0]
+              ms=e.get('date')
+              now_ms=int(datetime.datetime.now(datetime.timezone.utc).timestamp()*1000)
+              age=(now_ms-int(ms))/60000 if ms else None
+              dt=datetime.datetime.fromtimestamp(int(ms)/1000, datetime.timezone(datetime.timedelta(hours=9))) if ms else None
+              print(f"NIGHTSCOUT_LATEST sgv={e.get('sgv')} direction={e.get('direction')} date_kst={dt.isoformat() if dt else None} age_minutes={age:.1f}" if age is not None else f"NIGHTSCOUT_LATEST sgv={e.get('sgv')} direction={e.get('direction')} date_kst=None age_minutes=None")
+          PY
       - name: Recreate project
         shell: bash
         run: |
@@ -27,5 +47,5 @@ jobs:
         run: gradle :app:assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4
         with:
-          name: HyeonaLowGuard-APK
+          name: HyeonaLowGuard-APK-v1.1
           path: /tmp/hyeona-src/HyeonaLowGuard/app/build/outputs/apk/debug/app-debug.apk
