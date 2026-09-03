@@ -21,8 +21,8 @@ jobs:
         run: |
           python - <<'PY'
           import json, urllib.request, datetime
-          url='https://hyeona.up.railway.app/api/v1/entries.json?count=1&_=' + str(int(datetime.datetime.now().timestamp()))
-          req=urllib.request.Request(url, headers={'Cache-Control':'no-cache','Pragma':'no-cache','User-Agent':'HyeonaLowGuard-build-check/1.1'})
+          url='https://hyeona.up.railway.app/api/v1/entries.json?count=12&_=' + str(int(datetime.datetime.now().timestamp()))
+          req=urllib.request.Request(url, headers={'Cache-Control':'no-cache','Pragma':'no-cache','User-Agent':'HyeonaLowGuard-build-check/1.2'})
           with urllib.request.urlopen(req, timeout=15) as r:
               data=json.load(r)
           if not data:
@@ -33,19 +33,26 @@ jobs:
               now_ms=int(datetime.datetime.now(datetime.timezone.utc).timestamp()*1000)
               age=(now_ms-int(ms))/60000 if ms else None
               dt=datetime.datetime.fromtimestamp(int(ms)/1000, datetime.timezone(datetime.timedelta(hours=9))) if ms else None
-              print(f"NIGHTSCOUT_LATEST sgv={e.get('sgv')} direction={e.get('direction')} date_kst={dt.isoformat() if dt else None} age_minutes={age:.1f}" if age is not None else f"NIGHTSCOUT_LATEST sgv={e.get('sgv')} direction={e.get('direction')} date_kst=None age_minutes=None")
+              print(f"NIGHTSCOUT_LATEST sgv={e.get('sgv')} direction={e.get('direction')} date_kst={dt.isoformat() if dt else None} age_minutes={age:.1f} readings={len(data)}" if age is not None else f"NIGHTSCOUT_LATEST sgv={e.get('sgv')} direction={e.get('direction')} readings={len(data)}")
           PY
-      - name: Recreate project
+      - name: Recreate v1.1 project
         shell: bash
         run: |
           cat hyeona_build_parts/part*.txt > /tmp/hyeona.b64
           base64 -d /tmp/hyeona.b64 > /tmp/HyeonaLowGuard_Android_Project.zip
           mkdir -p /tmp/hyeona-src
           unzip -q /tmp/HyeonaLowGuard_Android_Project.zip -d /tmp/hyeona-src
+      - name: Apply v1.2 prediction patch
+        shell: bash
+        run: |
+          base64 -d hyeona_v12_patch.py.gz.b64 | gzip -d > /tmp/hyeona_v12_patch.py
+          python /tmp/hyeona_v12_patch.py /tmp/hyeona-src/HyeonaLowGuard
+          grep -q "versionName '1.2.0'" /tmp/hyeona-src/HyeonaLowGuard/app/build.gradle
+          test -f /tmp/hyeona-src/HyeonaLowGuard/app/src/main/java/kr/hyeona/lowguard/PredictionEngine.java
       - name: Build debug APK
         working-directory: /tmp/hyeona-src/HyeonaLowGuard
         run: gradle :app:assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4
         with:
-          name: HyeonaLowGuard-APK-v1.1
+          name: HyeonaLowGuard-APK-v1.2
           path: /tmp/hyeona-src/HyeonaLowGuard/app/build/outputs/apk/debug/app-debug.apk
