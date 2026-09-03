@@ -1,0 +1,31 @@
+name: Build Hyeona Low Guard APK
+on:
+  push:
+    branches: [ hyeona-lowguard-build ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Recreate project
+        shell: bash
+        run: |
+          cat hyeona_build_parts/part*.txt > /tmp/hyeona.b64
+          base64 -d /tmp/hyeona.b64 > /tmp/HyeonaLowGuard_Android_Project.zip
+          mkdir -p /tmp/hyeona-src
+          unzip -q /tmp/HyeonaLowGuard_Android_Project.zip -d /tmp/hyeona-src
+      - name: Build debug APK
+        working-directory: /tmp/hyeona-src/HyeonaLowGuard
+        run: gradle :app:assembleDebug --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HyeonaLowGuard-APK
+          path: /tmp/hyeona-src/HyeonaLowGuard/app/build/outputs/apk/debug/app-debug.apk
