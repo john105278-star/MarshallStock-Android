@@ -7,11 +7,11 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.marshall.stockai"
+        applicationId = "com.marshall.stockai.v12"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10
-        versionName = "1.0.0"
+        versionCode = 12
+        versionName = "1.2.0"
     }
 
     compileOptions {
