@@ -35,10 +35,11 @@ jobs:
             git push
           fi
 
-      - name: Apply v1.2 Naver compatibility fixes
+      - name: Apply runtime compatibility fixes
         run: |
           python3 tools/apply_v12_runtime_fixes.py
           python3 tools/fix_v12_lambda.py
+          python3 tools/apply_v13_sector_fallbacks.py
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -63,14 +64,14 @@ jobs:
       - name: Verify and rename APK
         run: |
           test -f app/build/outputs/apk/debug/app-debug.apk
-          cp app/build/outputs/apk/debug/app-debug.apk MarshallStock-Integrated-v1.2.apk
-          ls -lh MarshallStock-Integrated-v1.2.apk
-          sha256sum MarshallStock-Integrated-v1.2.apk
+          cp app/build/outputs/apk/debug/app-debug.apk MarshallStock-Integrated-v1.3.apk
+          ls -lh MarshallStock-Integrated-v1.3.apk
+          sha256sum MarshallStock-Integrated-v1.3.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MarshallStock-Integrated-v1.2-APK
-          path: MarshallStock-Integrated-v1.2.apk
+          name: MarshallStock-Integrated-v1.3-APK
+          path: MarshallStock-Integrated-v1.3.apk
           if-no-files-found: error
           retention-days: 30
