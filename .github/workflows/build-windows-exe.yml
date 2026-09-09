@@ -1,4 +1,4 @@
-name: Build MarshallStock Windows v3.3 VISION JPG EXE
+name: Build MarshallStock Windows v3.4 VISION TRADING EXE
 
 on:
   workflow_dispatch:
@@ -9,6 +9,7 @@ on:
       - 'windows/v31_patch.py'
       - 'windows/v32_ui_patch.py'
       - 'windows/v33_jpg_patch.py'
+      - 'windows/v34_tv_recommend_patch.py'
       - '.github/workflows/build-windows-exe.yml'
 
 permissions:
@@ -27,13 +28,14 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Reconstruct core and apply v3.1 + v3.3 patches
+      - name: Reconstruct core and apply v3.1-v3.4 patches
         shell: pwsh
         run: |
           $payload = ((Get-Content 'windows/v30payload/part00.txt' -Raw) + (Get-Content 'windows/v30payload/part01.txt' -Raw) + (Get-Content 'windows/v30payload/part02.txt' -Raw) + (Get-Content 'windows/v30payload/part03.txt' -Raw)).Trim()
           [IO.File]::WriteAllBytes('windows/marshall_stock_v30.py', [Convert]::FromBase64String($payload))
           python windows/v31_patch.py
           python windows/v33_jpg_patch.py
+          python windows/v34_tv_recommend_patch.py
           python windows/v32_ui_patch.py
           python -m py_compile windows/marshall_stock_v30.py
 
@@ -46,12 +48,12 @@ jobs:
       - name: Build portable EXE
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --onefile --windowed --name MarshallStock-PRO-v3.3-VISION-JPG --collect-all PIL windows/marshall_stock_v30.py
+          pyinstaller --noconfirm --clean --onefile --windowed --name MarshallStock-PRO-v3.4-VISION-TRADING --collect-all PIL windows/marshall_stock_v30.py
 
       - name: Verify EXE
         shell: pwsh
         run: |
-          $exe = 'dist/MarshallStock-PRO-v3.3-VISION-JPG.exe'
+          $exe = 'dist/MarshallStock-PRO-v3.4-VISION-TRADING.exe'
           if (!(Test-Path $exe)) { throw 'EXE file was not created.' }
           Get-Item $exe | Format-List Name,Length,LastWriteTime
           Get-FileHash $exe -Algorithm SHA256
@@ -59,8 +61,8 @@ jobs:
       - name: Upload Windows EXE
         uses: actions/upload-artifact@v4
         with:
-          name: MarshallStock-PRO-v3.3-VISION-JPG-Windows-EXE
-          path: dist/MarshallStock-PRO-v3.3-VISION-JPG.exe
+          name: MarshallStock-PRO-v3.4-VISION-TRADING-Windows-EXE
+          path: dist/MarshallStock-PRO-v3.4-VISION-TRADING.exe
           if-no-files-found: error
           retention-days: 30
 
@@ -74,6 +76,6 @@ jobs:
           git add windows/latest_windows_run.txt
           git diff --cached --quiet
           if ($LASTEXITCODE -ne 0) {
-            git commit -m 'Record latest Windows v3.3 VISION JPG EXE run [skip ci]'
+            git commit -m 'Record latest Windows v3.4 VISION TRADING EXE run [skip ci]'
             git push
           }
