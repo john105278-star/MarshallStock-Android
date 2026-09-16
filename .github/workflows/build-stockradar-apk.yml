@@ -6,6 +6,7 @@ on:
     paths:
       - 'stockradar/parts/**'
       - 'stockradar_v03/**'
+      - 'stockradar_v04/**'
       - '.github/workflows/build-stockradar-apk.yml'
   workflow_dispatch:
 
@@ -68,7 +69,7 @@ jobs:
                   super.onCreate(b);
                   SecurePrefs p=new SecurePrefs(this);
                   LinearLayout root=new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setPadding(pad(20),pad(24),pad(20),pad(24));
-                  TextView title=new TextView(this); title.setText("키움 REST API 설정 · v0.3"); title.setTextSize(24); root.addView(title);
+                  TextView title=new TextView(this); title.setText("키움 REST API 설정 · v0.4"); title.setTextSize(24); root.addView(title);
                   TextView info=new TextView(this); info.setText("실전용 App Key는 실전(real) 서버와, 모의용 App Key는 모의(demo) 서버와 사용해야 합니다. 오류 8030은 이 둘이 서로 맞지 않을 때 발생합니다."); info.setPadding(0,pad(12),0,pad(12)); root.addView(info);
                   EditText key=new EditText(this); key.setHint("App Key"); key.setText(p.getSecret("appKey")); root.addView(key,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
                   EditText secret=new EditText(this); secret.setHint("App Secret"); secret.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD); secret.setText(p.getSecret("secret")); root.addView(secret,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -104,6 +105,25 @@ jobs:
           p.write_text(s)
           PY
 
+      - name: Apply v0.4 rebound chart
+        shell: bash
+        run: |
+          APP=stockradar/build/StockRadarMVP/app/src/main/java/com/stockradar/app
+          cp stockradar_v04/MainActivity.java "$APP/MainActivity.java"
+          cp stockradar_v04/ChartActivity.java "$APP/ChartActivity.java"
+          cp stockradar_v04/ReboundChartView.java "$APP/ReboundChartView.java"
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('stockradar/build/StockRadarMVP/app/build.gradle')
+          s=p.read_text().replace('versionCode 3','versionCode 4').replace("versionName '0.3.0'","versionName '0.4.0'")
+          p.write_text(s)
+          p=Path('stockradar/build/StockRadarMVP/app/src/main/AndroidManifest.xml')
+          s=p.read_text()
+          if '.ChartActivity' not in s:
+              s=s.replace('<activity android:name=".SettingsActivity" />','<activity android:name=".ChartActivity" />\n        <activity android:name=".SettingsActivity" />')
+          p.write_text(s)
+          PY
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -118,14 +138,14 @@ jobs:
         shell: bash
         run: |
           test -f stockradar/build/StockRadarMVP/app/build/outputs/apk/debug/app-debug.apk
-          cp stockradar/build/StockRadarMVP/app/build/outputs/apk/debug/app-debug.apk StockRadar-v0.3-marshall-pattern.apk
-          ls -lh StockRadar-v0.3-marshall-pattern.apk
-          sha256sum StockRadar-v0.3-marshall-pattern.apk
+          cp stockradar/build/StockRadarMVP/app/build/outputs/apk/debug/app-debug.apk StockRadar-v0.4-rebound-chart.apk
+          ls -lh StockRadar-v0.4-rebound-chart.apk
+          sha256sum StockRadar-v0.4-rebound-chart.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: StockRadar-v0.3-marshall-pattern-APK
-          path: StockRadar-v0.3-marshall-pattern.apk
+          name: StockRadar-v0.4-rebound-chart-APK
+          path: StockRadar-v0.4-rebound-chart.apk
           if-no-files-found: error
           retention-days: 30
