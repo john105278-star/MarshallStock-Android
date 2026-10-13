@@ -1,0 +1,67 @@
+name: Build GNC Energy Manager APK
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'gnc/parts/**'
+      - '.github/workflows/build-gnc-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: yes | sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Reconstruct GNC Android project
+        run: |
+          mkdir -p gnc/buildsrc
+          cat gnc/parts/part_*.txt > gnc/GNC_Energy_Manager_Project.zip.b64
+          base64 -d gnc/GNC_Energy_Manager_Project.zip.b64 > gnc/GNC_Energy_Manager_Project.zip
+          unzip -t gnc/GNC_Energy_Manager_Project.zip
+          unzip -q gnc/GNC_Energy_Manager_Project.zip -d gnc/buildsrc
+          test -f gnc/buildsrc/settings.gradle.kts
+          test -f gnc/buildsrc/app/src/main/java/com/gncmanager/app/MainActivity.java
+          test -f gnc/buildsrc/app/src/main/java/com/gncmanager/app/KiwoomClient.java
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build debug APK
+        working-directory: gnc/buildsrc
+        run: gradle --no-daemon :app:assembleDebug --stacktrace
+
+      - name: Verify and rename APK
+        run: |
+          test -f gnc/buildsrc/app/build/outputs/apk/debug/app-debug.apk
+          cp gnc/buildsrc/app/build/outputs/apk/debug/app-debug.apk GNC-Energy-Manager-v1.0.apk
+          ls -lh GNC-Energy-Manager-v1.0.apk
+          sha256sum GNC-Energy-Manager-v1.0.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: GNC-Energy-Manager-v1.0-APK
+          path: GNC-Energy-Manager-v1.0.apk
+          if-no-files-found: error
+          retention-days: 30
