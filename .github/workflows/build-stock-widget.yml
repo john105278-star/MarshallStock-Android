@@ -34,7 +34,7 @@ jobs:
         run: |
           mkdir -p widget/project
           base64 -d widget/buildsrc.tar.xz.b64.txt > widget/source.tar.xz
-          echo "b2acf6a62578d0701b12f999961ac822ddde07e598fdaef5f663083555b14408  widget/source.tar.xz" | sha256sum -c
+          echo "5e687b91bb07c54782422e9a90eabf977043a761ad9e74b9674c8cf1a7ceffca  widget/source.tar.xz" | sha256sum -c
           tar -xJf widget/source.tar.xz -C widget/project
           test -f widget/project/app/src/main/AndroidManifest.xml
           test -f widget/project/app/src/main/java/kr/marshall/stockwidget/TickerService.java
