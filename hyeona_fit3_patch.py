@@ -107,6 +107,10 @@ g=root/'app/build.gradle'
 gs=g.read_text()
 if "versionCode 5" not in gs or "versionName '1.3.1'" not in gs:
     raise SystemExit('unexpected Family version')
+gs=gs.replace("applicationId 'kr.hyeona.lowguard.family'","applicationId 'kr.hyeona.lowguard.fit3'")
 gs=gs.replace('versionCode 5','versionCode 6').replace("versionName '1.3.1'","versionName '1.3.2'")
 g.write_text(gs)
-print('Fit3 bridge patch applied')
+manifest=root/'app/src/main/AndroidManifest.xml'
+ms=manifest.read_text().replace('android:label="현아 저혈 가드 Family"','android:label="현아 저혈 가드 Fit3"')
+manifest.write_text(ms)
+print('Fit3 bridge patch applied with package kr.hyeona.lowguard.fit3')
