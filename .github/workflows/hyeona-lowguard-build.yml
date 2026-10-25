@@ -47,7 +47,9 @@ jobs:
       - name: Apply v1.3 dashboard and watch patch
         shell: bash
         run: |
-          base64 -d hyeona_v13_patch.py.gz.b64 | gzip -d > /tmp/hyeona_v13_patch.py
+          cat hyeona_v13_parts/part*.txt > /tmp/hyeona_v13_patch.b64
+          test "$(wc -c < /tmp/hyeona_v13_patch.b64)" -eq 46268
+          base64 -d /tmp/hyeona_v13_patch.b64 | gzip -d > /tmp/hyeona_v13_patch.py
           python /tmp/hyeona_v13_patch.py /tmp/hyeona-src/HyeonaLowGuard
           grep -q "versionName '1.3.0'" /tmp/hyeona-src/HyeonaLowGuard/app/build.gradle
           grep -q "include ':app', ':wear'" /tmp/hyeona-src/HyeonaLowGuard/settings.gradle
