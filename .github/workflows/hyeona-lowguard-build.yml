@@ -1,4 +1,4 @@
-name: Build Hyeona Low Guard v1.3
+name: Build Hyeona Low Guard v1.3.1 Family
 on:
   push:
     branches: [ hyeona-lowguard-build ]
@@ -54,6 +54,40 @@ jobs:
           grep -q "versionName '1.3.0'" /tmp/hyeona-src/HyeonaLowGuard/app/build.gradle
           grep -q "include ':app', ':wear'" /tmp/hyeona-src/HyeonaLowGuard/settings.gradle
           test -f /tmp/hyeona-src/HyeonaLowGuard/wear/src/main/java/kr/hyeona/lowguard/wear/MainActivity.java
+      - name: Apply conflict-free Family package
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          root=Path('/tmp/hyeona-src/HyeonaLowGuard')
+          p=root/'app/build.gradle'
+          s=p.read_text()
+          s=s.replace("applicationId 'kr.hyeona.lowguard'","applicationId 'kr.hyeona.lowguard.family'")
+          s=s.replace("versionCode 4","versionCode 5")
+          s=s.replace("versionName '1.3.0'","versionName '1.3.1'")
+          p.write_text(s)
+          p=root/'wear/build.gradle'
+          s=p.read_text()
+          s=s.replace("applicationId 'kr.hyeona.lowguard.wear'","applicationId 'kr.hyeona.lowguard.family.wear'")
+          s=s.replace("versionCode 1","versionCode 2")
+          s=s.replace("versionName '1.0.0'","versionName '1.3.1'")
+          p.write_text(s)
+          for mf,label in [
+              (root/'app/src/main/AndroidManifest.xml','현아 저혈 가드 Family'),
+              (root/'wear/src/main/AndroidManifest.xml','현아 혈당 워치 Family')]:
+              s=mf.read_text()
+              if '워치' in label:
+                  s=s.replace('android:label="현아 혈당 워치"', f'android:label="{label}"')
+              else:
+                  s=s.replace('android:label="현아 저혈 가드"', f'android:label="{label}"')
+              mf.write_text(s)
+          print((root/'app/build.gradle').read_text())
+          print((root/'wear/build.gradle').read_text())
+          PY
+          grep -q "applicationId 'kr.hyeona.lowguard.family'" /tmp/hyeona-src/HyeonaLowGuard/app/build.gradle
+          grep -q "applicationId 'kr.hyeona.lowguard.family.wear'" /tmp/hyeona-src/HyeonaLowGuard/wear/build.gradle
+          grep -q "versionName '1.3.1'" /tmp/hyeona-src/HyeonaLowGuard/app/build.gradle
+
       - name: Build phone tablet APK
         working-directory: /tmp/hyeona-src/HyeonaLowGuard
         run: gradle :app:assembleDebug --stacktrace
@@ -64,10 +98,10 @@ jobs:
         shell: bash
         run: |
           mkdir -p /tmp/hyeona-apks
-          cp /tmp/hyeona-src/HyeonaLowGuard/app/build/outputs/apk/debug/app-debug.apk /tmp/hyeona-apks/HyeonaLowGuard-v1.3-phone-tablet.apk
-          cp /tmp/hyeona-src/HyeonaLowGuard/wear/build/outputs/apk/debug/wear-debug.apk /tmp/hyeona-apks/HyeonaLowGuard-v1.3-galaxy-watch.apk
+          cp /tmp/hyeona-src/HyeonaLowGuard/app/build/outputs/apk/debug/app-debug.apk /tmp/hyeona-apks/HyeonaLowGuard-v1.3.1-Family-phone-tablet.apk
+          cp /tmp/hyeona-src/HyeonaLowGuard/wear/build/outputs/apk/debug/wear-debug.apk /tmp/hyeona-apks/HyeonaLowGuard-v1.3.1-Family-galaxy-watch.apk
           ls -lh /tmp/hyeona-apks
       - uses: actions/upload-artifact@v4
         with:
-          name: HyeonaLowGuard-v1.3-APKs
+          name: HyeonaLowGuard-v1.3.1-Family-APKs
           path: /tmp/hyeona-apks/*.apk
