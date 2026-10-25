@@ -1,4 +1,4 @@
-name: Build Hyeona Low Guard v1.3.1 Family
+name: Build Hyeona Low Guard v1.3.2 Family Fit3
 on:
   push:
     branches: [ hyeona-lowguard-build ]
@@ -88,6 +88,135 @@ jobs:
           grep -q "applicationId 'kr.hyeona.lowguard.family.wear'" /tmp/hyeona-src/HyeonaLowGuard/wear/build.gradle
           grep -q "versionName '1.3.1'" /tmp/hyeona-src/HyeonaLowGuard/app/build.gradle
 
+      - name: Apply Galaxy Fit3 notification bridge
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/hyeona-src/HyeonaLowGuard/app/src/main/java/kr/hyeona/lowguard/MonitorService.java')
+          s=p.read_text()
+
+          s=s.replace(
+              'private static final int PREDICTION_ID = 1103;\n    private static final String CHANNEL_MONITOR = "monitor_v2";',
+              'private static final int PREDICTION_ID = 1103;\n'
+              '    private static final int FIT3_STATUS_ID = 1201;\n'
+              '    private static final int FIT3_ALERT_ID = 1202;\n'
+              '    private static final String CHANNEL_MONITOR = "monitor_v2";'
+          )
+          s=s.replace(
+              'private static final String CHANNEL_ALARM = "alarm_v2";',
+              'private static final String CHANNEL_ALARM = "alarm_v2";\n'
+              '    private static final String CHANNEL_FIT3_STATUS = "fit3_status_v1";\n'
+              '    private static final String CHANNEL_FIT3_ALERT = "fit3_alert_v1";'
+          )
+          s=s.replace(
+              'private long lastKnownReadingDate = 0L;',
+              'private long lastKnownReadingDate = 0L;\n    private long lastFit3ReadingDate = 0L;'
+          )
+
+          s=s.replace(
+              '            Severity severity = classify(sgv, delta, direction, p);',
+              '            postFit3GlucoseIfNew(date, sgv, delta, direction, extras);\n'
+              '            Severity severity = classify(sgv, delta, direction, p);'
+          )
+
+          s=s.replace(
+              '        nm.createNotificationChannel(alarm);',
+              '        nm.createNotificationChannel(alarm);\n\n'
+              '        NotificationChannel fitStatus = new NotificationChannel(\n'
+              '                CHANNEL_FIT3_STATUS, "Galaxy Fit3 혈당 표시", NotificationManager.IMPORTANCE_DEFAULT);\n'
+              '        fitStatus.setDescription("새 Nightscout 혈당이 들어올 때 Fit3에서 확인하기 위한 일반 알림");\n'
+              '        fitStatus.setSound(null, null);\n'
+              '        fitStatus.enableVibration(false);\n'
+              '        fitStatus.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);\n'
+              '        nm.createNotificationChannel(fitStatus);\n\n'
+              '        NotificationChannel fitAlert = new NotificationChannel(\n'
+              '                CHANNEL_FIT3_ALERT, "Galaxy Fit3 저혈 긴급 알림", NotificationManager.IMPORTANCE_HIGH);\n'
+              '        fitAlert.setDescription("Fit3 미러링용 저혈·예측·수신중단 경고");\n'
+              '        fitAlert.setSound(null, null);\n'
+              '        fitAlert.enableVibration(true);\n'
+              '        fitAlert.setVibrationPattern(new long[]{0, 500, 250, 500, 250, 800});\n'
+              '        fitAlert.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);\n'
+              '        nm.createNotificationChannel(fitAlert);'
+          )
+
+          s=s.replace(
+              '        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);\n        nm.notify(ALARM_ID, b.build());',
+              '        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);\n'
+              '        nm.notify(ALARM_ID, b.build());\n'
+              '        postFit3Alert(title, body, test);'
+          )
+
+          s=s.replace(
+              '        ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(PREDICTION_ID, b.build());',
+              '        ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(PREDICTION_ID, b.build());\n'
+              '        postFit3Alert(title, body, test);'
+          )
+
+          marker='    private void cancelAlarmNotification() {'
+          methods=r'''
+    private void postFit3GlucoseIfNew(long readingDate, int sgv, double delta, String direction, NightscoutExtras x) {
+        if (readingDate <= 0L || readingDate == lastFit3ReadingDate) return;
+        lastFit3ReadingDate = readingDate;
+        String title = "현아 혈당 " + sgv + " " + arrowFor(direction);
+        StringBuilder body = new StringBuilder(String.format(Locale.KOREA, "변화 %+.1f mg/dL", delta));
+        if (x != null && !Double.isNaN(x.iob)) body.append(String.format(Locale.KOREA, " · IOB %.2fU", x.iob));
+        if (x != null && x.pumpBattery >= 0) body.append(" · 펌프 ").append(x.pumpBattery).append("%");
+        if (x != null && !Double.isNaN(x.reservoir)) body.append(String.format(Locale.KOREA, " · 잔량 %.0fU", x.reservoir));
+
+        Intent open = new Intent(this, MainActivity.class);
+        PendingIntent pi = PendingIntent.getActivity(this, 1201, open,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Notification n = new Notification.Builder(this, CHANNEL_FIT3_STATUS)
+                .setSmallIcon(R.drawable.ic_shield)
+                .setContentTitle(title)
+                .setContentText(body.toString())
+                .setStyle(new Notification.BigTextStyle().bigText(body.toString()))
+                .setCategory(Notification.CATEGORY_STATUS)
+                .setVisibility(Notification.VISIBILITY_PUBLIC)
+                .setPriority(Notification.PRIORITY_DEFAULT)
+                .setOngoing(false)
+                .setAutoCancel(true)
+                .setContentIntent(pi)
+                .build();
+        ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(FIT3_STATUS_ID, n);
+    }
+
+    private void postFit3Alert(String originalTitle, String body, boolean test) {
+        Intent open = new Intent(this, MainActivity.class);
+        PendingIntent pi = PendingIntent.getActivity(this, 1202, open,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        String title = (test ? "[Fit3 연동 테스트] " : "") + originalTitle;
+        Notification n = new Notification.Builder(this, CHANNEL_FIT3_ALERT)
+                .setSmallIcon(R.drawable.ic_alert)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setStyle(new Notification.BigTextStyle().bigText(body))
+                .setCategory(Notification.CATEGORY_MESSAGE)
+                .setVisibility(Notification.VISIBILITY_PUBLIC)
+                .setPriority(Notification.PRIORITY_MAX)
+                .setOngoing(false)
+                .setAutoCancel(true)
+                .setContentIntent(pi)
+                .build();
+        ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(FIT3_ALERT_ID, n);
+    }
+
+'''
+          if marker not in s:
+              raise SystemExit('cancelAlarm marker missing')
+          s=s.replace(marker, methods+marker, 1)
+          p.write_text(s)
+
+          g=Path('/tmp/hyeona-src/HyeonaLowGuard/app/build.gradle')
+          gs=g.read_text().replace("versionCode 5","versionCode 6").replace("versionName '1.3.1'","versionName '1.3.2'")
+          g.write_text(gs)
+
+          print('Fit3 bridge patch applied')
+          PY
+          grep -q 'CHANNEL_FIT3_ALERT' /tmp/hyeona-src/HyeonaLowGuard/app/src/main/java/kr/hyeona/lowguard/MonitorService.java
+          grep -q "versionName '1.3.2'" /tmp/hyeona-src/HyeonaLowGuard/app/build.gradle
+
       - name: Build phone tablet APK
         working-directory: /tmp/hyeona-src/HyeonaLowGuard
         run: gradle :app:assembleDebug --stacktrace
@@ -98,10 +227,10 @@ jobs:
         shell: bash
         run: |
           mkdir -p /tmp/hyeona-apks
-          cp /tmp/hyeona-src/HyeonaLowGuard/app/build/outputs/apk/debug/app-debug.apk /tmp/hyeona-apks/HyeonaLowGuard-v1.3.1-Family-phone-tablet.apk
-          cp /tmp/hyeona-src/HyeonaLowGuard/wear/build/outputs/apk/debug/wear-debug.apk /tmp/hyeona-apks/HyeonaLowGuard-v1.3.1-Family-galaxy-watch.apk
+          cp /tmp/hyeona-src/HyeonaLowGuard/app/build/outputs/apk/debug/app-debug.apk /tmp/hyeona-apks/HyeonaLowGuard-v1.3.2-Family-Fit3-phone-tablet.apk
+          cp /tmp/hyeona-src/HyeonaLowGuard/wear/build/outputs/apk/debug/wear-debug.apk /tmp/hyeona-apks/HyeonaLowGuard-v1.3.2-Family-galaxy-watch.apk
           ls -lh /tmp/hyeona-apks
       - uses: actions/upload-artifact@v4
         with:
-          name: HyeonaLowGuard-v1.3.1-Family-APKs
+          name: HyeonaLowGuard-v1.3.2-Family-Fit3-APKs
           path: /tmp/hyeona-apks/*.apk
