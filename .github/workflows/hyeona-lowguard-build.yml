@@ -1,4 +1,4 @@
-name: Build Hyeona Low Guard v1.3.2 Family Fit3
+name: Build Hyeona Low Guard Tablet v1.4.0
 on:
   push:
     branches: [ hyeona-lowguard-build ]
@@ -15,23 +15,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Verify Nightscout dashboard fields
-        continue-on-error: true
-        shell: bash
-        run: |
-          python - <<'PY'
-          import json, urllib.request
-          base='https://hyeona.up.railway.app'
-          def get(path):
-              req=urllib.request.Request(base+path,headers={'Cache-Control':'no-cache','User-Agent':'HyeonaLowGuard-build/1.3'})
-              with urllib.request.urlopen(req,timeout=15) as r:return json.load(r)
-          e=get('/api/v1/entries.json?count=1')[0]
-          d=get('/api/v1/devicestatus.json?count=1')[0]
-          p=d.get('pump',{}); oa=d.get('openaps',{}); sug=oa.get('suggested',{}); io=oa.get('iob',{})
-          print('BG',e.get('sgv'),'IOB',io.get('iob',sug.get('IOB')),'COB',sug.get('COB'),
-                'PUMP_BATT',p.get('battery',{}).get('percent'),'RES',p.get('reservoir'),
-                'PUMP_STATUS',p.get('status',{}).get('status'),'UPLOADER',d.get('uploaderBattery'))
-          PY
+
       - name: Recreate v1.1 project
         shell: bash
         run: |
@@ -39,12 +23,14 @@ jobs:
           base64 -d /tmp/hyeona.b64 > /tmp/HyeonaLowGuard_Android_Project.zip
           mkdir -p /tmp/hyeona-src
           unzip -q /tmp/HyeonaLowGuard_Android_Project.zip -d /tmp/hyeona-src
+
       - name: Apply v1.2 prediction patch
         shell: bash
         run: |
           base64 -d hyeona_v12_patch.py.gz.b64 | gzip -d > /tmp/hyeona_v12_patch.py
           python /tmp/hyeona_v12_patch.py /tmp/hyeona-src/HyeonaLowGuard
-      - name: Apply v1.3 dashboard and watch patch
+
+      - name: Apply v1.3 dashboard patch
         shell: bash
         run: |
           cat hyeona_v13_parts/part*.txt > /tmp/hyeona_v13_patch.b64
@@ -52,63 +38,29 @@ jobs:
           base64 -d /tmp/hyeona_v13_patch.b64 | gzip -d > /tmp/hyeona_v13_patch.py
           python /tmp/hyeona_v13_patch.py /tmp/hyeona-src/HyeonaLowGuard
           grep -q "versionName '1.3.0'" /tmp/hyeona-src/HyeonaLowGuard/app/build.gradle
-          grep -q "include ':app', ':wear'" /tmp/hyeona-src/HyeonaLowGuard/settings.gradle
-          test -f /tmp/hyeona-src/HyeonaLowGuard/wear/src/main/java/kr/hyeona/lowguard/wear/MainActivity.java
-      - name: Apply conflict-free Family package
+
+      - name: Apply dark tablet UI and split alarm sounds
         shell: bash
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          root=Path('/tmp/hyeona-src/HyeonaLowGuard')
-          p=root/'app/build.gradle'
-          s=p.read_text()
-          s=s.replace("applicationId 'kr.hyeona.lowguard'","applicationId 'kr.hyeona.lowguard.family'")
-          s=s.replace("versionCode 4","versionCode 5")
-          s=s.replace("versionName '1.3.0'","versionName '1.3.1'")
-          p.write_text(s)
-          p=root/'wear/build.gradle'
-          s=p.read_text()
-          s=s.replace("applicationId 'kr.hyeona.lowguard.wear'","applicationId 'kr.hyeona.lowguard.family.wear'")
-          s=s.replace("versionCode 1","versionCode 2")
-          s=s.replace("versionName '1.0.0'","versionName '1.3.1'")
-          p.write_text(s)
-          for mf,label in [
-              (root/'app/src/main/AndroidManifest.xml','현아 저혈 가드 Family'),
-              (root/'wear/src/main/AndroidManifest.xml','현아 혈당 워치 Family')]:
-              s=mf.read_text()
-              if '워치' in label:
-                  s=s.replace('android:label="현아 혈당 워치"', f'android:label="{label}"')
-              else:
-                  s=s.replace('android:label="현아 저혈 가드"', f'android:label="{label}"')
-              mf.write_text(s)
-          print((root/'app/build.gradle').read_text())
-          print((root/'wear/build.gradle').read_text())
-          PY
-          grep -q "applicationId 'kr.hyeona.lowguard.family'" /tmp/hyeona-src/HyeonaLowGuard/app/build.gradle
-          grep -q "applicationId 'kr.hyeona.lowguard.family.wear'" /tmp/hyeona-src/HyeonaLowGuard/wear/build.gradle
-          grep -q "versionName '1.3.1'" /tmp/hyeona-src/HyeonaLowGuard/app/build.gradle
+          base64 -d hyeona_tablet_patch.py.gz.b64 | gzip -d > /tmp/hyeona_tablet_patch.py
+          python /tmp/hyeona_tablet_patch.py /tmp/hyeona-src/HyeonaLowGuard
+          grep -q "applicationId 'kr.hyeona.lowguard.tablet'" /tmp/hyeona-src/HyeonaLowGuard/app/build.gradle
+          grep -q "versionName '1.4.0'" /tmp/hyeona-src/HyeonaLowGuard/app/build.gradle
+          grep -q 'TYPE_RINGTONE' /tmp/hyeona-src/HyeonaLowGuard/app/src/main/java/kr/hyeona/lowguard/MonitorService.java
+          grep -q 'tablet ? 118 : 72' /tmp/hyeona-src/HyeonaLowGuard/app/src/main/java/kr/hyeona/lowguard/MainActivity.java
 
-      - name: Apply Galaxy Fit3 notification bridge
-        shell: bash
-        run: |
-          python hyeona_fit3_patch.py /tmp/hyeona-src/HyeonaLowGuard
-          grep -q 'CHANNEL_FIT3_ALERT' /tmp/hyeona-src/HyeonaLowGuard/app/src/main/java/kr/hyeona/lowguard/MonitorService.java
-          grep -q "versionName '1.3.2'" /tmp/hyeona-src/HyeonaLowGuard/app/build.gradle
-
-      - name: Build phone tablet APK
+      - name: Build tablet APK
         working-directory: /tmp/hyeona-src/HyeonaLowGuard
         run: gradle :app:assembleDebug --stacktrace
-      - name: Build Galaxy Watch APK
-        working-directory: /tmp/hyeona-src/HyeonaLowGuard
-        run: gradle :wear:assembleDebug --stacktrace
-      - name: Collect APKs
+
+      - name: Collect APK
         shell: bash
         run: |
-          mkdir -p /tmp/hyeona-apks
-          cp /tmp/hyeona-src/HyeonaLowGuard/app/build/outputs/apk/debug/app-debug.apk /tmp/hyeona-apks/HyeonaLowGuard-v1.3.2-Family-Fit3-phone-tablet.apk
-          cp /tmp/hyeona-src/HyeonaLowGuard/wear/build/outputs/apk/debug/wear-debug.apk /tmp/hyeona-apks/HyeonaLowGuard-v1.3.2-Family-galaxy-watch.apk
-          ls -lh /tmp/hyeona-apks
+          mkdir -p /tmp/hyeona-tablet
+          cp /tmp/hyeona-src/HyeonaLowGuard/app/build/outputs/apk/debug/app-debug.apk /tmp/hyeona-tablet/HyeonaLowGuard-Tablet-v1.4.0-Dark.apk
+          ls -lh /tmp/hyeona-tablet/HyeonaLowGuard-Tablet-v1.4.0-Dark.apk
+
       - uses: actions/upload-artifact@v4
         with:
-          name: HyeonaLowGuard-v1.3.2-Family-Fit3-APKs
-          path: /tmp/hyeona-apks/*.apk
+          name: HyeonaLowGuard-Tablet-v1.4.0-Dark
+          path: /tmp/hyeona-tablet/HyeonaLowGuard-Tablet-v1.4.0-Dark.apk
